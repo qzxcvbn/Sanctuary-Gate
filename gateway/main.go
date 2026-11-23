@@ -521,12 +521,16 @@ func verifyTokenHandshake(nonceHex, sigHex, aggregator string) bool {
 	}
 
 	nonceBytes, err := hex.DecodeString(nonceHex)
-	if err != nil {
+	if err != nil || nonceHex != hex.EncodeToString(nonceBytes) {
 		return false
 	}
 
 	sigBytes, err := hex.DecodeString(sigHex)
 	if err != nil {
+		return false
+	}
+	canonicalSig := hex.EncodeToString(sigBytes)
+	if sigHex != canonicalSig {
 		return false
 	}
 
@@ -537,8 +541,8 @@ func verifyTokenHandshake(nonceHex, sigHex, aggregator string) bool {
 	// Replay check: only a signature that has actually verified gets recorded —
 	// an invalid/malformed attempt must not consume a cache slot that could
 	// later shadow the legitimate resend of that same literal string.
-	if tokenCache.storeIfAbsent(sigHex) {
-		log.Printf("[SECURITY WARNING] Replay attack blocked on signature: %s", sigHex[:16])
+	if tokenCache.storeIfAbsent(canonicalSig) {
+		log.Printf("[SECURITY WARNING] Replay attack blocked on signature: %s", canonicalSig[:16])
 		return false
 	}
 

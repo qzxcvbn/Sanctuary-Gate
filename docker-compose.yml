@@ -1,0 +1,57 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: ./gateway/Dockerfile
+    container_name: sanctuary_gate_edge
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/etc/sanctuary/config:ro
+      - ./keys:/etc/sanctuary/keys
+    environment:
+      - ENV=development
+      - CONFIG_PATH=/etc/sanctuary/config/ai-permissions.json
+      # Only trust X-Forwarded-For from these peers (e.g. your TLS-terminating
+      # reverse proxy/load balancer in front of this container). Leave unset if
+      # this container receives traffic directly from the public internet.
+      - GATEWAY_TRUSTED_PROXIES=
+      # Key directory for persistent HMAC challenge signing key (survives restarts).
+      - KEY_DIR=/etc/sanctuary/keys
+    networks:
+      - sanctuary_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      mint:
+        condition: service_healthy
+
+  mint:
+    build:
+      context: .
+      dockerfile: ./mint/Dockerfile
+    container_name: sanctuary_mint_oracle
+    expose:
+      - "8081"
+    volumes:
+      - ./config:/etc/sanctuary/config:ro
+      - ./keys:/etc/sanctuary/keys
+    environment:
+      - CONFIG_PATH=/etc/sanctuary/config/ai-permissions.json
+      - MINT_KEY_DIR=/etc/sanctuary/keys
+    networks:
+      - sanctuary_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  sanctuary_network:
+    driver: bridge
